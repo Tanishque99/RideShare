@@ -1,7 +1,5 @@
 # RideShare
 
-A small end-to-end demo of a ride-sharing backend using:
-
 - **3-node CockroachDB cluster** (local)
 - **Synthetic data**
 - **Python** for data pipeline & matching logic
