@@ -28,11 +28,13 @@ The system:
 ### Install CockroachDB
 '''brew install cockroachdb/cockroach/cockroach'''
 
-## 2. File Structure
+2. File Structure
 project-root/
   README.md
+
   db/
     schema.sql              # All table definitions for rideshare DB
+
   src/
     db.py                   # CockroachDB connection + transaction helper
     loader.py               # Synthetic data generator -> staging_nyc_raw
@@ -41,12 +43,12 @@ project-root/
     matcher.py              # Core matching + completion logic
     replayer.py             # Replays rides, assigns & completes them
     app.py                  # Flask API + web server
-    run_demo.py             # Pipeline
+    run_demo.py             # Pipeline / demo runner
 
   templates/
     index.html              # Frontend dashboard (drivers, rides, metrics)
 
-  venv/                     # Python virtualenv 
+  venv/                     # Python virtualenv
 
   ## 3. Cockroach 3 Node Clusters
 
