@@ -78,11 +78,17 @@ The system:
         --join=localhost:26257,localhost:26258,localhost:26259 \
         --background
 
-  Initialise Cluster  : cockroach init --insecure --host=localhost:26257
+  Initialise Cluster  : 
+        
+      cockroach init --insecure --host=localhost:26257
 
-  Create Databse : cockroach sql --insecure --host=localhost:26257 -e "CREATE DATABASE rideshare;"
+  Create Databse : 
+      
+      cockroach sql --insecure --host=localhost:26257 -e "CREATE DATABASE rideshare;"
 
-  Upload Schema : cockroach sql --insecure --host=localhost:26257 --database=rideshare < db/schema.sql
+  Upload Schema : 
+
+      cockroach sql --insecure --host=localhost:26257 --database=rideshare < db/schema.sql
 
   Cluster UI - http://localhost:8080/ or http://localhost:8081 or http://localhost:8082
 
