@@ -48,7 +48,8 @@ The system:
 
   ## 3. Cockroach 3 Node Clusters
 
-      # Node 1
+  Node 1
+      
       cockroach start \
         --insecure \
         --store=node1 \
@@ -57,7 +58,8 @@ The system:
         --join=localhost:26257,localhost:26258,localhost:26259 \
         --background
 
-      # Node 2
+   Node 2
+      
       cockroach start \
         --insecure \
         --store=node2 \
@@ -66,7 +68,8 @@ The system:
         --join=localhost:26257,localhost:26258,localhost:26259 \
         --background
     
-      # Node 3
+   Node 3
+      
       cockroach start \
         --insecure \
         --store=node3 \
