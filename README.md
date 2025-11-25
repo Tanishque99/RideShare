@@ -29,22 +29,22 @@ The system:
 '''brew install cockroachdb/cockroach/cockroach'''
 
 ## 2. File Structure
-project-root/
-├── README.md
-├── db/
-│   └── schema.sql              # All table definitions for the rideshare DB
-├── src/
-│   ├── db.py                   # CockroachDB connection + transaction helper
-│   ├── loader.py               # Synthetic data generator -> staging_nyc_raw
-│   ├── cleaner.py              # Cleans raw -> nyc_clean
-│   ├── init_drivers.py         # Creates drivers based on nyc_clean
-│   ├── matcher.py              # Core matching + completion logic
-│   ├── replayer.py             # Replays rides, assigns & completes them
-│   ├── app.py                  # Flask API + web server
-│   └── run_demo.py             # Pipeline / demo runner
-├── templates/
-│   └── index.html              # Frontend dashboard (drivers, rides, metrics)
-└── venv/                       # Python virtual environment (created when setting up)
+    project-root/
+    ├── README.md
+    ├── db/
+    │   └── schema.sql              # All table definitions for the rideshare DB
+    ├── src/
+    │   ├── db.py                   # CockroachDB connection + transaction helper
+    │   ├── loader.py               # Synthetic data generator -> staging_nyc_raw
+    │   ├── cleaner.py              # Cleans raw -> nyc_clean
+    │   ├── init_drivers.py         # Creates drivers based on nyc_clean
+    │   ├── matcher.py              # Core matching + completion logic
+    │   ├── replayer.py             # Replays rides, assigns & completes them
+    │   ├── app.py                  # Flask API + web server
+    │   └── run_demo.py             # Pipeline / demo runner
+    ├── templates/
+    │   └── index.html              # Frontend dashboard (drivers, rides, metrics)
+    └── venv/                       # Python virtual environment (created when setting up)
 
   ## 3. Cockroach 3 Node Clusters
 
