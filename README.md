@@ -28,7 +28,7 @@ The system:
 ### Install CockroachDB
 '''brew install cockroachdb/cockroach/cockroach'''
 
-2. File Structure
+##2. File Structure
 project-root/
   README.md
 
