@@ -1,140 +1,303 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>RideShareDB Demo</title>
+  <meta charset="UTF-8" />
+  <title>🚖 RideShareDB Dashboard</title>
+
+  <!-- Tailwind -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
   <style>
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; margin: 20px; }
-    h1 { margin-bottom: 0.5rem; }
-    .grid { display: grid; grid-template-columns: 2fr 3fr; gap: 20px; margin-top: 20px; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; }
-    th { background: #f5f5f5; }
-    .card { border: 1px solid #ddd; padding: 12px; border-radius: 6px; }
-    .metrics { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
-    .metric { padding: 8px 12px; border-radius: 6px; background: #f5f5f5; }
-    small { color: #555; }
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #f5f7fa;
+      transition: all 0.35s ease-in-out;
+    }
+    #driver-map {
+      width: 100%;
+      height: 100%;
+    }
+    .table-container {
+      max-height: 350px;
+      overflow-y: auto;
+    }
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+    }
+    .metric-value {
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+    body.dark {
+      background: #1e1e1e;
+      color: #EEEEEE;
+    }
+    body.dark .card {
+      background: #222831 !important;
+      color: #EEEEEE;
+    }
+    body.dark .text-gray-500 {
+      color: #d1d1d1;
+    }
+    tr {
+      transition: background-color 0.2s ease-in-out;
+    }
   </style>
 </head>
-<body>
-  <h1>RideShareDB Demo</h1>
-  <small>3-node CockroachDB · Synthetic rides · Live matching</small>
 
-  <div class="card">
-    <h2>Metrics</h2>
-    <div class="metrics">
-      <div class="metric">
-        <strong id="m-total-rides">0</strong><br/>
-        <span>Total rides</span>
-      </div>
-      <div class="metric">
-        <strong id="m-completed">0</strong><br/>
-        <span>Completed trips</span>
-      </div>
-      <div class="metric">
-        <strong id="m-avg-distance">–</strong><br/>
-        <span>Avg distance (km)</span>
-      </div>
-      <div class="metric">
-        <strong id="m-avg-amount">–</strong><br/>
-        <span>Avg fare</span>
-      </div>
-      <div class="metric">
-        <strong id="m-drivers-status">–</strong><br/>
-        <span>Drivers by status</span>
-      </div>
-    </div>
-    <small>Auto-refresh every 3 seconds.</small>
-  </div>
+<body class="p-6 bg-gray-100 transition-all">
+  <!-- Dark Mode Toggle -->
+  <button onclick="document.body.classList.toggle('dark')"
+    class="px-4 py-2 rounded-lg shadow absolute top-4 right-4 bg-white hover:bg-gray-200 dark:bg-gray-800 dark:text-white">
+    🌙 Toggle Dark Mode
+  </button>
 
-  <div class="grid">
+  <!-- Header -->
+  <header class="mb-4">
+    <h1 class="text-3xl font-bold dark:text-white">🚖 RideShareDB Dashboard</h1>
+    <p class="text-gray-600 dark:text-gray-300">
+      3-node CockroachDB · Synthetic rides · Serializable Matching · Live Monitoring
+    </p>
+  </header>
+
+  <!-- Metrics -->
+  <section class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+    <div class="card"><p class="text-gray-500">Total Rides</p><h2 id="m-total-rides" class="metric-value text-blue-500">0</h2></div>
+    <div class="card"><p class="text-gray-500">Completed Trips</p><h2 id="m-completed" class="metric-value text-green-500">0</h2></div>
+    <div class="card"><p class="text-gray-500">Active Matchings</p><h2 id="m-active" class="metric-value text-yellow-500">0</h2></div>
+    <div class="card"><p class="text-gray-500">Avg Dist (km)</p><h2 id="m-avg-distance" class="metric-value">–</h2></div>
+    <div class="card"><p class="text-gray-500">Avg Fare ($)</p><h2 id="m-avg-amount" class="metric-value">–</h2></div>
+    <div class="card"><p class="text-gray-500">✔ Completion Rate (%)</p><h2 id="m-completion-rate" class="metric-value text-purple-500">0%</h2></div>
+  </section>
+
+  <!-- Performance Charts -->
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="card"><canvas id="chart-throughput"></canvas></div>
+    <div class="card"><canvas id="chart-latency"></canvas></div>
+    <div class="card"><canvas id="chart-retries"></canvas></div>
+  </section>
+
+  <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <div class="card"><canvas id="chart-consistency-delay"></canvas></div>
+    <div class="card"><canvas id="chart-driver-status"></canvas></div>
+    <div class="card"><canvas id="chart-ride-states"></canvas></div>
+  </section>
+
+  <!-- Drivers / Rides Tables -->
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="card">
-      <h2>Drivers</h2>
-      <table id="drivers-table">
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Lon</th>
-            <th>Lat</th>
-            <th>Updated</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <h2 class="font-semibold mb-2">Drivers</h2>
+      <div class="table-container">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-200 dark:bg-gray-700">
+            <tr>
+              <th class="px-4 py-2">Driver</th>
+              <th class="px-4 py-2">Status</th>
+              <th class="px-4 py-2 text-center">Longitude</th>
+              <th class="px-4 py-2 text-center">Latitude</th>
+              <th class="px-4 py-2 text-center">Last Updated</th>
+            </tr>
+          </thead>
+          <tbody id="drivers-table-body" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
-      <h2>Recent rides</h2>
-      <table id="rides-table">
-        <thead>
-          <tr>
-            <th>Requested at</th>
-            <th>Driver</th>
-            <th>Status</th>
-            <th>Pickup</th>
-            <th>Dropoff</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+      <h2 class="font-semibold mb-2">Recent Rides</h2>
+      <div class="table-container">
+        <table class="min-w-full text-sm">
+          <thead class="bg-gray-200 dark:bg-gray-700">
+            <tr>
+              <th class="px-4 py-2">Requested At</th>
+              <th class="px-4 py-2">Driver</th>
+              <th class="px-4 py-2">Status</th>
+              <th class="px-4 py-2 text-center">Pickup</th>
+              <th class="px-4 py-2 text-center">Dropoff</th>
+            </tr>
+          </thead>
+          <tbody id="rides-table-body" class="divide-y divide-gray-200 dark:divide-gray-700"></tbody>
+        </table>
+      </div>
     </div>
-  </div>
+  </section>
+
+  <!-- Map -->
+  <section class="card h-96">
+    <h2 class="font-semibold">Live Driver Distribution</h2>
+    <div id="driver-map" class="rounded-lg overflow-hidden"></div>
+  </section>
+
+  <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
+    CockroachDB enforces serializable isolation for safe concurrent ride matching.
+  </p>
 
   <script>
+    let charts = {}, map, driverMarkers = [];
+
+    function initCharts() {
+      const settings = { responsive: true, animation: { duration: 600 }, scales: { y: { beginAtZero: true } } };
+
+      charts.throughput = new Chart(document.getElementById("chart-throughput"), {
+        type: "line",
+        data: { labels: [], datasets: [{ label: "Throughput", data: [], borderColor: "#3b82f6", borderWidth: 2 }] },
+        options: settings
+      });
+
+      charts.latency = new Chart(document.getElementById("chart-latency"), {
+        type: "line",
+        data: { labels: [], datasets: [{ label: "Latency (ms)", data: [], borderColor: "#8b5cf6", borderWidth: 2 }] },
+        options: settings
+      });
+
+      charts.retries = new Chart(document.getElementById("chart-retries"), {
+        type: "bar",
+        data: { labels: [], datasets: [{ label: "Retries", data: [], backgroundColor: "#f97316" }] },
+        options: settings
+      });
+
+      charts.consistencyDelay = new Chart(document.getElementById("chart-consistency-delay"), {
+        type: "line",
+        data: { labels: [], datasets: [{ label: "Consistency Delay", data: [], borderColor: "#10b981", borderWidth: 2 }] },
+        options: settings
+      });
+
+      charts.driverStatus = new Chart(document.getElementById("chart-driver-status"), {
+        type: "pie",
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ["#2563eb", "#10b981", "#f59e0b"] }] }
+      });
+
+      charts.rideStates = new Chart(document.getElementById("chart-ride-states"), {
+        type: "bar",
+        data: {
+          labels: ["Requested", "Assigned", "En Route", "Completed"],
+          datasets: [{
+            label: "Ride State Count",   /* 🔥 FIXED UNDEFINED LABEL */
+            data: [0, 0, 0, 0],
+            backgroundColor: ["#F29339", "#2563eb", "#10b981", "#6b7280"],
+            borderRadius: 6
+          }]
+        }
+      });
+    }
+
     async function loadMetrics() {
-      const res = await fetch('/api/metrics');
-      const m = await res.json();
-      document.getElementById('m-total-rides').textContent = m.total_rides;
-      document.getElementById('m-completed').textContent = m.completed_trips;
-      document.getElementById('m-avg-distance').textContent =
-        m.avg_distance ? m.avg_distance.toFixed(2) : '–';
-      document.getElementById('m-avg-amount').textContent =
-        m.avg_amount ? m.avg_amount.toFixed(2) : '–';
-      document.getElementById('m-drivers-status').textContent =
-        JSON.stringify(m.drivers_by_status);
+      const m = await (await fetch("/api/metrics")).json();
+
+      document.getElementById("m-total-rides").textContent = m.total_rides ?? 0;
+      document.getElementById("m-completed").textContent = m.completed_trips ?? 0;
+      document.getElementById("m-active").textContent = m.active_matchings ?? 0;
+
+      /* 🔧 FIXED PROPER RENDERING OF AVG VALUES */
+      document.getElementById("m-avg-distance").textContent =
+        (typeof m.avg_distance === "number") ? m.avg_distance.toFixed(2) : "–";
+
+      document.getElementById("m-avg-amount").textContent =
+        (typeof m.avg_amount === "number") ? m.avg_amount.toFixed(2) : "–";
+
+      document.getElementById("m-completion-rate").textContent =
+        m.total_rides ? ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%" : "–";
+
+      /* Real-time charts */
+      appendData(charts.throughput, m.throughput || 0);
+      appendData(charts.latency, m.avg_latency_ms || 0);
+      appendData(charts.consistencyDelay, m.consistency_delay_ms || 0);
+
+      charts.rideStates.data.datasets[0].data = [
+        m.state_requested ?? 0,
+        m.state_assigned ?? 0,
+        m.state_enroute ?? 0,
+        m.completed_trips ?? 0
+      ];
+      charts.rideStates.update();
+
+      if (m.drivers_by_status) {
+        charts.driverStatus.data.labels = Object.keys(m.drivers_by_status);
+        charts.driverStatus.data.datasets[0].data = Object.values(m.drivers_by_status);
+        charts.driverStatus.update();
+      }
     }
 
     async function loadDrivers() {
-      const res = await fetch('/api/drivers');
-      const drivers = await res.json();
-      const tbody = document.querySelector('#drivers-table tbody');
-      tbody.innerHTML = '';
+      const drivers = await (await fetch("/api/drivers")).json();
+      const tbody = document.getElementById("drivers-table-body");
+      tbody.innerHTML = "";
+      driverMarkers.forEach(m => map.removeLayer(m));
+      driverMarkers = [];
+
       drivers.forEach(d => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${d.name}</td>
-          <td>${d.status}</td>
-          <td>${d.lon?.toFixed(4) ?? ''}</td>
-          <td>${d.lat?.toFixed(4) ?? ''}</td>
-          <td>${d.last_updated ?? ''}</td>
-        `;
-        tbody.appendChild(tr);
+        tbody.innerHTML += `
+          <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
+            <td class="px-4 py-2 font-medium">${d.name}</td>
+            <td class="px-4 py-2">${d.status}</td>
+            <td class="px-4 py-2 text-center">${d.lon?.toFixed(4) ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${d.lat?.toFixed(4) ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${d.last_updated ?? "-"}</td>
+          </tr>`;
+
+        if (d.lat && d.lon) {
+          const marker = L.circleMarker([d.lat, d.lon], { radius: 6, color: "#2563eb" }).addTo(map);
+          marker.bindPopup(`<b>${d.name}</b><br>Status: ${d.status}`);
+          driverMarkers.push(marker);
+        }
       });
     }
 
     async function loadRides() {
-      const res = await fetch('/api/rides');
-      const rides = await res.json();
-      const tbody = document.querySelector('#rides-table tbody');
-      tbody.innerHTML = '';
+      const rides = await (await fetch("/api/rides")).json();
+      const tbody = document.getElementById("rides-table-body");
+      tbody.innerHTML = "";
+
       rides.forEach(r => {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${r.requested_at ?? ''}</td>
-          <td>${r.assigned_driver ?? ''}</td>
-          <td>${r.status}</td>
-          <td>${r.pickup_lat?.toFixed(4) ?? ''}, ${r.pickup_lon?.toFixed(4) ?? ''}</td>
-          <td>${r.dropoff_lat?.toFixed(4) ?? ''}, ${r.dropoff_lon?.toFixed(4) ?? ''}</td>
-        `;
-        tbody.appendChild(tr);
+        tbody.innerHTML += `
+          <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
+            <td class="px-4 py-2">${r.requested_at ?? "-"}</td>
+            <td class="px-4 py-2">${r.assigned_driver ?? "-"}</td>
+            <td class="px-4 py-2">${r.status ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${r.pickup_lat?.toFixed(4) ?? "-"}, ${r.pickup_lon?.toFixed(4) ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${r.dropoff_lat?.toFixed(4) ?? "-"}, ${r.dropoff_lon?.toFixed(4) ?? "-"}</td>
+          </tr>`;
       });
+    }
+
+    function appendData(chart, value) {
+      const label = new Date().toLocaleTimeString();
+      chart.data.labels.push(label);
+      chart.data.datasets[0].data.push(value);
+      if (chart.data.labels.length > 20) {
+        chart.data.labels.shift();
+        chart.data.datasets[0].data.shift();
+      }
+      chart.update();
+    }
+
+    function initMap() {
+      map = L.map("driver-map").setView([40.75, -73.97], 11);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
     }
 
     async function refreshAll() {
       await Promise.all([loadMetrics(), loadDrivers(), loadRides()]);
     }
 
+    initCharts();
+    initMap();
     refreshAll();
     setInterval(refreshAll, 3000);
   </script>
