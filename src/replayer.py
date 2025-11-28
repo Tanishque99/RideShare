@@ -6,7 +6,7 @@ from db import get_cursor
 
 SIMULATION_SPEEDUP = 30
 MIN_SIM_DURATION_SEC = 2
-MAX_CONCURRENCY = 500
+MAX_CONCURRENCY = 30
 TIMEOUT_SECONDS = 300
 
 def process_ride(row, idx):
