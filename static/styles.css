@@ -1,0 +1,62 @@
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: #f5f7fa;
+  transition: all 0.35s ease-in-out;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+}
+
+.metric-value {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+}
+
+/* Table */
+.table-container {
+  max-height: 350px;
+  overflow-y: auto;
+}
+
+/* Map */
+#driver-map {
+  height: 100%;
+}
+
+/* Dark mode */
+body.dark {
+  background: #1e1e1e;
+  color: #EEEEEE;
+}
+body.dark .card {
+  background: #222831;
+  color: white;
+}
+body.dark .text-gray-500 {
+  color: #d1d1d1;
+}
+
+/* Button */
+#dark-toggle {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+body.dark #dark-toggle {
+  background: #393e46;
+  color: white;
+}

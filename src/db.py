@@ -7,6 +7,7 @@ import time
 DB_DSN = "postgresql://root@localhost:26257/rideshare?sslmode=disable"
 
 
+
 def get_conn():
     return psycopg2.connect(DB_DSN)
 
