@@ -100,3 +100,18 @@ ADD CONSTRAINT IF NOT EXISTS chk_distance CHECK (distance >= 0);
 
 ALTER TABLE trips_p
 ADD CONSTRAINT IF NOT EXISTS chk_fare CHECK (total_amount >= 0);
+
+ALTER TABLE rides_p
+ADD COLUMN IF NOT EXISTS assigned_at TIMESTAMP,
+ADD COLUMN IF NOT EXISTS rejection_reason STRING;
+
+ALTER TABLE rides_p ADD COLUMN IF NOT EXISTS status STRING DEFAULT 'REQUESTED';
+
+ALTER TABLE rides_p ADD COLUMN IF NOT EXISTS retries INT DEFAULT 0;
+ALTER TABLE rides_p ADD COLUMN IF NOT EXISTS match_latency_ms FLOAT;
+
+ALTER TABLE rides_p
+ADD CONSTRAINT unique_active_driver_per_ride
+UNIQUE (assigned_driver) 
+WHERE status IN ('ASSIGNED', 'EN_ROUTE');
+
