@@ -87,10 +87,9 @@
   </section>
 
   <!-- Performance Charts -->
-  <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="card"><canvas id="chart-throughput"></canvas></div>
     <div class="card"><canvas id="chart-latency"></canvas></div>
-    <div class="card"><canvas id="chart-retries"></canvas></div>
   </section>
 
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -151,48 +150,146 @@
   <script>
     let charts = {}, map, driverMarkers = [];
 
-    function initCharts() {
-      const settings = { responsive: true, animation: { duration: 600 }, scales: { y: { beginAtZero: true } } };
+    // Helper to build line-chart options with axis labels + units in tooltip
+    function makeLineOptions(yLabel, unitLabel) {
+      return {
+        responsive: true,
+        animation: { duration: 600 },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Time (HH:MM:SS)",
+              font: { size: 12 }
+            }
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: yLabel,
+              font: { size: 12 }
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            labels: { font: { size: 13 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: function (context) {
+                const value = context.parsed.y;
+                const unit = context.dataset.unit || "";
+                return `${value}${unit}`;
+              }
+            }
+          }
+        }
+      };
+    }
 
+    function initCharts() {
+      // Throughput: rides per minute
       charts.throughput = new Chart(document.getElementById("chart-throughput"), {
         type: "line",
-        data: { labels: [], datasets: [{ label: "Throughput", data: [], borderColor: "#3b82f6", borderWidth: 2 }] },
-        options: settings
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Throughput",
+            data: [],
+            borderColor: "#3b82f6",
+            borderWidth: 2,
+            unit: " rides/min"
+          }]
+        },
+        options: makeLineOptions("Throughput (rides/min)", " rides/min")
       });
 
+      // Latency: matching latency in ms
       charts.latency = new Chart(document.getElementById("chart-latency"), {
         type: "line",
-        data: { labels: [], datasets: [{ label: "Latency (ms)", data: [], borderColor: "#8b5cf6", borderWidth: 2 }] },
-        options: settings
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Latency",
+            data: [],
+            borderColor: "#8b5cf6",
+            borderWidth: 2,
+            unit: " ms"
+          }]
+        },
+        options: makeLineOptions("Match Latency (ms)", " ms")
       });
 
-      charts.retries = new Chart(document.getElementById("chart-retries"), {
-        type: "bar",
-        data: { labels: [], datasets: [{ label: "Retries", data: [], backgroundColor: "#f97316" }] },
-        options: settings
-      });
-
+      // Consistency delay: derived from latency
       charts.consistencyDelay = new Chart(document.getElementById("chart-consistency-delay"), {
         type: "line",
-        data: { labels: [], datasets: [{ label: "Consistency Delay", data: [], borderColor: "#10b981", borderWidth: 2 }] },
-        options: settings
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Consistency Delay",
+            data: [],
+            borderColor: "#10b981",
+            borderWidth: 2,
+            unit: " ms"
+          }]
+        },
+        options: makeLineOptions("Consistency Delay (ms)", " ms")
       });
 
+      // Driver status distribution
       charts.driverStatus = new Chart(document.getElementById("chart-driver-status"), {
         type: "pie",
-        data: { labels: [], datasets: [{ data: [], backgroundColor: ["#2563eb", "#10b981", "#f59e0b"] }] }
+        data: {
+          labels: [],
+          datasets: [{
+            data: [],
+            backgroundColor: ["#2563eb", "#10b981", "#f59e0b"]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "bottom" }
+          }
+        }
       });
 
+      // Ride state counts
       charts.rideStates = new Chart(document.getElementById("chart-ride-states"), {
         type: "bar",
         data: {
-          labels: ["Requested", "Assigned", "En Route", "Completed"],
+          labels: ["Requested", "En Route", "Completed"],
           datasets: [{
-            label: "Ride State Count",   /* 🔥 FIXED UNDEFINED LABEL */
-            data: [0, 0, 0, 0],
-            backgroundColor: ["#F29339", "#2563eb", "#10b981", "#6b7280"],
+            label: "Ride State Count",
+            data: [0, 0, 0],
+            backgroundColor: ["#F29339", "#10b981", "#6b7280"],
             borderRadius: 6
           }]
+        },
+        options: {
+          responsive: true,
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: "Ride State",
+                font: { size: 12 }
+              }
+            },
+            y: {
+              beginAtZero: true,
+              title: {
+                display: true,
+                text: "Number of Rides",
+                font: { size: 12 }
+              }
+            }
+          },
+          plugins: {
+            legend: { labels: { font: { size: 13 } } }
+          }
         }
       });
     }
@@ -204,7 +301,6 @@
       document.getElementById("m-completed").textContent = m.completed_trips ?? 0;
       document.getElementById("m-active").textContent = m.active_matchings ?? 0;
 
-      /* 🔧 FIXED PROPER RENDERING OF AVG VALUES */
       document.getElementById("m-avg-distance").textContent =
         (typeof m.avg_distance === "number") ? m.avg_distance.toFixed(2) : "–";
 
@@ -214,19 +310,20 @@
       document.getElementById("m-completion-rate").textContent =
         m.total_rides ? ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%" : "–";
 
-      /* Real-time charts */
+      // Push time-series points
       appendData(charts.throughput, m.throughput || 0);
       appendData(charts.latency, m.avg_latency_ms || 0);
       appendData(charts.consistencyDelay, m.consistency_delay_ms || 0);
 
+      // Ride state bar
       charts.rideStates.data.datasets[0].data = [
         m.state_requested ?? 0,
-        m.state_assigned ?? 0,
         m.state_enroute ?? 0,
         m.completed_trips ?? 0
       ];
       charts.rideStates.update();
 
+      // Driver status pie
       if (m.drivers_by_status) {
         charts.driverStatus.data.labels = Object.keys(m.drivers_by_status);
         charts.driverStatus.data.datasets[0].data = Object.values(m.drivers_by_status);
