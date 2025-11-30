@@ -86,6 +86,48 @@
     <div class="card"><p class="text-gray-500">✔ Completion Rate (%)</p><h2 id="m-completion-rate" class="metric-value text-purple-500">0%</h2></div>
   </section>
 
+   <!-- Cluster Health Metrics -->
+  <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="card">
+    <h2 class="font-semibold mb-3">Node Status</h2>
+    <div class="grid grid-cols-4 gap-3 text-center">
+      <div><p class="text-gray-500 text-sm">Live</p><div id="n-live" class="metric-value text-green-500">0</div></div>
+      <div><p class="text-gray-500 text-sm">Suspect</p><div id="n-suspect" class="metric-value text-yellow-500">0</div></div>
+      <div><p class="text-gray-500 text-sm">Draining</p><div id="n-draining" class="metric-value text-orange-500">0</div></div>
+      <div><p class="text-gray-500 text-sm">Dead</p><div id="n-dead" class="metric-value text-red-500">0</div></div>
+    </div>
+    <p class="text-sm mt-1">
+      <a
+        href="http://localhost:8082/#/overview/list"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+      >
+        ↗ Open CockroachDB Console
+      </a>
+    </p>
+  </div>
+
+  <div class="card">
+    <h2 class="font-semibold mb-3">Replication Status</h2>
+    <div class="grid grid-cols-3 gap-3 text-center">
+      <div><p class="text-gray-500 text-sm">Total Ranges</p><div id="r-total" class="metric-value text-blue-500">0</div></div>
+      <div><p class="text-gray-500 text-sm">Under-replicated</p><div id="r-under" class="metric-value text-yellow-500">0</div></div>
+      <div><p class="text-gray-500 text-sm">Unavailable</p><div id="r-unavail" class="metric-value text-red-500">0</div></div>
+    </div>
+    <p class="text-sm mt-1">
+      <a
+        href="http://localhost:8082/#/overview/list"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
+      >
+        ↗ Open CockroachDB Console
+      </a>
+    </p>
+  </div>
+</section>
+
   <!-- Performance Charts -->
   <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="card"><canvas id="chart-throughput"></canvas></div>
@@ -97,6 +139,9 @@
     <div class="card"><canvas id="chart-driver-status"></canvas></div>
     <div class="card"><canvas id="chart-ride-states"></canvas></div>
   </section>
+
+ 
+
 
   <!-- Drivers / Rides Tables -->
   <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -389,9 +434,23 @@
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
     }
 
+    async function loadCrdbOverview() {
+        const c = await (await fetch("/api/crdb/overview")).json();
+
+        document.getElementById("n-live").textContent = c.nodes?.live ?? 0;
+        document.getElementById("n-suspect").textContent = c.nodes?.suspect ?? 0;
+        document.getElementById("n-draining").textContent = c.nodes?.draining ?? 0;
+        document.getElementById("n-dead").textContent = c.nodes?.dead ?? 0;
+
+        document.getElementById("r-total").textContent = c.replication?.total_ranges ?? 0;
+        document.getElementById("r-under").textContent = c.replication?.under_replicated_ranges ?? 0;
+        document.getElementById("r-unavail").textContent = c.replication?.unavailable_ranges ?? 0;
+      }
+
     async function refreshAll() {
-      await Promise.all([loadMetrics(), loadDrivers(), loadRides()]);
-    }
+        await Promise.all([loadMetrics(), loadDrivers(), loadRides(), loadCrdbOverview()]);
+      }
+
 
     initCharts();
     initMap();

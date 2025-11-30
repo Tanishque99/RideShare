@@ -141,5 +141,65 @@ def api_metrics():
         "drivers_by_status": drivers_status,
     })
 
+def _scalar(sql: str, default=0):
+    try:
+        with get_cursor() as cur:
+            cur.execute(sql)
+            v = cur.fetchone()[0]
+            return default if v is None else v
+    except Exception:
+        return default
+
+@app.route("/api/crdb/overview")
+def api_crdb_overview():
+    # Node status
+    total_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.gossip_nodes;", 0))
+    live_nodes  = int(_scalar("SELECT count(*) FROM crdb_internal.gossip_nodes WHERE is_live;", 0))  
+    dead_nodes  = max(total_nodes - live_nodes, 0)
+
+    # Draining column name varies by version; detect via information_schema
+    draining_nodes = 0
+    with get_cursor() as cur:
+        cur.execute("""
+            SELECT column_name
+            FROM information_schema.columns
+            WHERE table_schema='crdb_internal' AND table_name='node_runtime_info';
+        """)
+        cols = {r[0] for r in cur.fetchall()}
+
+    if "draining" in cols:
+        draining_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.node_runtime_info WHERE draining;", 0))
+    elif "is_draining" in cols:
+        draining_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.node_runtime_info WHERE is_draining;", 0))
+
+    # Replication status
+    total_ranges = int(_scalar("SELECT count(*) FROM crdb_internal.ranges;", 0))  
+
+    # These are Cockroach metrics: ranges.underreplicated / ranges.unavailable 
+    under_replicated = int(_scalar("""
+        SELECT COALESCE(sum((metrics->>'ranges.underreplicated')::DECIMAL), 0)::INT
+        FROM crdb_internal.kv_store_status;
+    """, 0))
+
+    unavailable = int(_scalar("""
+        SELECT COALESCE(sum((metrics->>'ranges.unavailable')::DECIMAL), 0)::INT
+        FROM crdb_internal.kv_store_status;
+    """, 0))
+
+    return jsonify({
+        "nodes": {
+            "total": total_nodes,
+            "live": live_nodes,
+            "suspect": 0,          # optional: add later if you decide on a definition/source
+            "draining": draining_nodes,
+            "dead": dead_nodes,
+        },
+        "replication": {
+            "total_ranges": total_ranges,
+            "under_replicated_ranges": under_replicated,
+            "unavailable_ranges": unavailable,
+        }
+    })
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=True)
