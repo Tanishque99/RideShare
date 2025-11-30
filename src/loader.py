@@ -29,7 +29,7 @@ def load_synthetic(n_rows=100):
       2.5 + dist * (1.5 + random()*1.0) + random()*3.0                          AS total_amount
     FROM (
       SELECT
-        '2015-01-01'::timestamp + (random() * interval '31 days')               AS ts,
+        '2025-11-29'::timestamp + (random() * interval '31 days')               AS ts,
         -74.05 + random()*0.3                                                   AS pickup_lon,
         40.63 + random()*0.22                                                   AS pickup_lat,
         0.5 + random()*19.5                                                     AS dist
