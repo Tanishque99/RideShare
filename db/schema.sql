@@ -115,3 +115,4 @@ ADD CONSTRAINT unique_active_driver_per_ride
 UNIQUE (assigned_driver) 
 WHERE status IN ('ASSIGNED', 'EN_ROUTE');
 
+

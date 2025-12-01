@@ -66,16 +66,14 @@ def api_rides():
 def api_metrics():
     global _last_completed, _last_time
 
+    # STEP 1: Fetch all necessary metrics from DB
     with get_cursor() as cur:
-        # Basic counts
         cur.execute("SELECT COUNT(*) FROM rides_p;")
         total = cur.fetchone()[0] or 0
 
         cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='COMPLETED';")
         completed = cur.fetchone()[0] or 0
 
-
-        # 🔥 Requested = only actively pending rides (not assigned yet)
         cur.execute("""
             SELECT COUNT(*)
             FROM rides_p
@@ -87,19 +85,36 @@ def api_metrics():
         cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='EN_ROUTE';")
         enroute = cur.fetchone()[0] or 0
 
-        # Average metrics
         cur.execute("SELECT AVG(distance), AVG(total_amount) FROM trips_p;")
         avg_dist, avg_amt = cur.fetchone()
 
-        # Retry count
         cur.execute("SELECT SUM(retries) FROM rides_p;")
         retries = cur.fetchone()[0] or 0
 
-        # Driver count
         cur.execute("SELECT status, COUNT(*) FROM drivers GROUP BY status;")
         drivers_status = {row[0]: row[1] for row in cur.fetchall()}
 
-    # -------- THROUGHPUT (delta method) --------
+    # STEP 2: Detect idle state
+    is_idle = (requested == 0 and enroute == 0 and completed == 0)
+
+    if is_idle:
+        return jsonify({
+            "total_rides": total,
+            "completed_trips": completed,
+            "state_requested": requested,
+            "state_enroute": enroute,
+            "active_matchings": enroute,
+            "avg_distance": float(avg_dist) if avg_dist else 0,
+            "avg_amount": float(avg_amt) if avg_amt else 0,
+            "completion_rate": 0,
+            "throughput": None,
+            "avg_latency_ms": None,
+            "consistency_delay_ms": None,
+            "transaction_retries": retries,
+            "drivers_by_status": drivers_status,
+        })
+
+    # STEP 3: Compute throughput
     current_time = time.time()
     if _last_time is not None:
         delta_rides = completed - _last_completed
@@ -112,18 +127,29 @@ def api_metrics():
     _last_completed = completed
     _last_time = current_time
 
-    # -------- LATENCY --------
-    if throughput > 0:
-        avg_latency_ms = round(random.uniform(80, 150), 2)
-    else:
-        avg_latency_ms = round(random.uniform(30, 80), 2)
+    if completed == 0 or total == 0:
+        throughput = 0
 
-    # -------- CONSISTENCY DELAY --------
-    consistency_delay_ms = round(
-        max(1, avg_latency_ms * 0.015 + math.sin(time.time() * 0.5) * 0.4),
-        2
-    )
+    # STEP 4: Real latency computation (via match_latency_ms)
+    with get_cursor() as cur:
+        cur.execute("SELECT AVG(match_latency_ms) FROM rides_p WHERE match_latency_ms IS NOT NULL;")
+        avg_latency_db = cur.fetchone()[0]
 
+    avg_latency_ms = round(avg_latency_db, 2) if avg_latency_db is not None else 0
+    try:
+        with get_cursor() as cur:
+            cur.execute("""
+                SELECT AVG((metrics->>'consistency.queue.processing.latency')::FLOAT)
+                FROM crdb_internal.kv_store_status;
+            """)
+            consistency_delay_db = cur.fetchone()[0]
+        # Convert from seconds → ms
+        consistency_delay_ms = round(consistency_delay_db * 1000, 2) if consistency_delay_db is not None else None
+    except Exception:
+        consistency_delay_ms = None  # Display as "Idle" if not available
+
+
+    # STEP 5: Return real-time metrics
     return jsonify({
         "total_rides": total,
         "completed_trips": completed,
@@ -133,7 +159,6 @@ def api_metrics():
         "avg_distance": float(avg_dist) if avg_dist else 0,
         "avg_amount": float(avg_amt) if avg_amt else 0,
         "completion_rate": round((completed / total) * 100, 2) if total else 0,
-
         "throughput": throughput,
         "avg_latency_ms": avg_latency_ms,
         "consistency_delay_ms": consistency_delay_ms,

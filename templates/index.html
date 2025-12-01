@@ -1,5 +1,6 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>🚖 RideShareDB Dashboard</title>
@@ -16,18 +17,21 @@
 
   <style>
     body {
-      font-family: 'Inter', system-ui, sans-serif;
+      font-family: "Inter", system-ui, sans-serif;
       background: #f5f7fa;
       transition: all 0.35s ease-in-out;
     }
+
     #driver-map {
       width: 100%;
       height: 100%;
     }
+
     .table-container {
       max-height: 350px;
       overflow-y: auto;
     }
+
     .card {
       background: white;
       border-radius: 16px;
@@ -35,26 +39,32 @@
       box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
       transition: transform 0.25s ease, box-shadow 0.25s ease;
     }
+
     .card:hover {
       transform: translateY(-3px);
       box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
     }
+
     .metric-value {
       font-size: 2.2rem;
       font-weight: 700;
       letter-spacing: -1px;
     }
+
     body.dark {
       background: #1e1e1e;
-      color: #EEEEEE;
+      color: #eeeeee;
     }
+
     body.dark .card {
       background: #222831 !important;
-      color: #EEEEEE;
+      color: #eeeeee;
     }
+
     body.dark .text-gray-500 {
       color: #d1d1d1;
     }
+
     tr {
       transition: background-color 0.2s ease-in-out;
     }
@@ -70,78 +80,112 @@
 
   <!-- Header -->
   <header class="mb-4">
-    <h1 class="text-3xl font-bold dark:text-white">🚖 RideShareDB Dashboard</h1>
+    <h1 class="text-3xl font-bold dark:text-white">
+      🚖 RideShareDB Dashboard
+    </h1>
     <p class="text-gray-600 dark:text-gray-300">
-      3-node CockroachDB · Synthetic rides · Serializable Matching · Live Monitoring
+      3-node CockroachDB · Synthetic rides · Serializable Matching · Live
+      Monitoring
     </p>
   </header>
 
   <!-- Metrics -->
-  <section class="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-    <div class="card"><p class="text-gray-500">Total Rides</p><h2 id="m-total-rides" class="metric-value text-blue-500">0</h2></div>
-    <div class="card"><p class="text-gray-500">Completed Trips</p><h2 id="m-completed" class="metric-value text-green-500">0</h2></div>
-    <div class="card"><p class="text-gray-500">Active Matchings</p><h2 id="m-active" class="metric-value text-yellow-500">0</h2></div>
-    <div class="card"><p class="text-gray-500">Avg Dist (km)</p><h2 id="m-avg-distance" class="metric-value">–</h2></div>
-    <div class="card"><p class="text-gray-500">Avg Fare ($)</p><h2 id="m-avg-amount" class="metric-value">–</h2></div>
-    <div class="card"><p class="text-gray-500">✔ Completion Rate (%)</p><h2 id="m-completion-rate" class="metric-value text-purple-500">0%</h2></div>
+  <section class="grid grid-cols-2 md:grid-cols-7 gap-4 mb-6">
+    <div class="card">
+      <p class="text-gray-500">Total Rides</p>
+      <h2 id="m-total-rides" class="metric-value text-blue-500">0</h2>
+    </div>
+    <div class="card">
+      <p class="text-gray-500">Completed Trips</p>
+      <h2 id="m-completed" class="metric-value text-green-500">0</h2>
+    </div>
+    <div class="card">
+      <p class="text-gray-500">Active Matchings</p>
+      <h2 id="m-active" class="metric-value text-yellow-500">0</h2>
+    </div>
+    <div class="card">
+      <p class="text-gray-500">Avg Dist (km)</p>
+      <h2 id="m-avg-distance" class="metric-value">–</h2>
+    </div>
+    <div class="card">
+      <p class="text-gray-500">Avg Fare ($)</p>
+      <h2 id="m-avg-amount" class="metric-value">–</h2>
+    </div>
+    <div class="card">
+      <p class="text-gray-500">Completion Rate (%)</p>
+      <h2 id="m-completion-rate" class="metric-value text-purple-500">0%</h2>
+    </div>
+      <div class="card">
+     <p class="text-gray-500">Concurrency Retries</p>
+    <h2 id="m-retries" class="metric-value text-pink-500">0</h2>
+  </div>
   </section>
 
-   <!-- Cluster Health Metrics -->
+  <!-- Cluster Health Metrics -->
   <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-  <div class="card">
-    <h2 class="font-semibold mb-3">Node Status</h2>
-    <div class="grid grid-cols-4 gap-3 text-center">
-      <div><p class="text-gray-500 text-sm">Live</p><div id="n-live" class="metric-value text-green-500">0</div></div>
-      <div><p class="text-gray-500 text-sm">Suspect</p><div id="n-suspect" class="metric-value text-yellow-500">0</div></div>
-      <div><p class="text-gray-500 text-sm">Draining</p><div id="n-draining" class="metric-value text-orange-500">0</div></div>
-      <div><p class="text-gray-500 text-sm">Dead</p><div id="n-dead" class="metric-value text-red-500">0</div></div>
+    <div class="card">
+      <h2 class="font-semibold mb-3">Node Status</h2>
+      <div class="grid grid-cols-4 gap-3 text-center">
+        <div>
+          <p class="text-gray-500 text-sm">Live</p>
+          <div id="n-live" class="metric-value text-green-500">0</div>
+        </div>
+        <div>
+          <p class="text-gray-500 text-sm">Suspect</p>
+          <div id="n-suspect" class="metric-value text-yellow-500">0</div>
+        </div>
+        <div>
+          <p class="text-gray-500 text-sm">Draining</p>
+          <div id="n-draining" class="metric-value text-orange-500">0</div>
+        </div>
+        <div>
+          <p class="text-gray-500 text-sm">Dead</p>
+          <div id="n-dead" class="metric-value text-red-500">0</div>
+        </div>
+      </div>
+      <p class="text-sm mt-1">
+        <a href="http://localhost:8082/#/overview/list" target="_blank" rel="noopener noreferrer"
+          class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200">
+          ↗ Open CockroachDB Console
+        </a>
+      </p>
     </div>
-    <p class="text-sm mt-1">
-      <a
-        href="http://localhost:8082/#/overview/list"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
-      >
-        ↗ Open CockroachDB Console
-      </a>
-    </p>
-  </div>
 
-  <div class="card">
-    <h2 class="font-semibold mb-3">Replication Status</h2>
-    <div class="grid grid-cols-3 gap-3 text-center">
-      <div><p class="text-gray-500 text-sm">Total Ranges</p><div id="r-total" class="metric-value text-blue-500">0</div></div>
-      <div><p class="text-gray-500 text-sm">Under-replicated</p><div id="r-under" class="metric-value text-yellow-500">0</div></div>
-      <div><p class="text-gray-500 text-sm">Unavailable</p><div id="r-unavail" class="metric-value text-red-500">0</div></div>
+    <div class="card">
+      <h2 class="font-semibold mb-3">Replication Status</h2>
+      <div class="grid grid-cols-3 gap-3 text-center">
+        <div>
+          <p class="text-gray-500 text-sm">Total Ranges</p>
+          <div id="r-total" class="metric-value text-blue-500">0</div>
+        </div>
+        <div>
+          <p class="text-gray-500 text-sm">Under-replicated</p>
+          <div id="r-under" class="metric-value text-yellow-500">0</div>
+        </div>
+        <div>
+          <p class="text-gray-500 text-sm">Unavailable</p>
+          <div id="r-unavail" class="metric-value text-red-500">0</div>
+        </div>
+      </div>
+      <p class="text-sm mt-1">
+        <a href="http://localhost:8082/#/overview/list" target="_blank" rel="noopener noreferrer"
+          class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200">
+          ↗ Open CockroachDB Console
+        </a>
+      </p>
     </div>
-    <p class="text-sm mt-1">
-      <a
-        href="http://localhost:8082/#/overview/list"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-blue-600 hover:text-blue-800 underline dark:text-blue-300 dark:hover:text-blue-200"
-      >
-        ↗ Open CockroachDB Console
-      </a>
-    </p>
-  </div>
+  </section>
+
+<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <div class="card"><canvas id="chart-throughput"></canvas></div>
+  <div class="card"><canvas id="chart-latency"></canvas></div>
 </section>
-
-  <!-- Performance Charts -->
-  <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-    <div class="card"><canvas id="chart-throughput"></canvas></div>
-    <div class="card"><canvas id="chart-latency"></canvas></div>
-  </section>
 
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
     <div class="card"><canvas id="chart-consistency-delay"></canvas></div>
     <div class="card"><canvas id="chart-driver-status"></canvas></div>
     <div class="card"><canvas id="chart-ride-states"></canvas></div>
   </section>
-
- 
-
 
   <!-- Drivers / Rides Tables -->
   <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -189,11 +233,14 @@
   </section>
 
   <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
-    CockroachDB enforces serializable isolation for safe concurrent ride matching.
+    CockroachDB enforces serializable isolation for safe concurrent ride
+    matching.
   </p>
 
   <script>
-    let charts = {}, map, driverMarkers = [];
+    let charts = {},
+      map,
+      driverMarkers = [];
 
     // Helper to build line-chart options with axis labels + units in tooltip
     function makeLineOptions(yLabel, unitLabel) {
@@ -205,21 +252,21 @@
             title: {
               display: true,
               text: "Time (HH:MM:SS)",
-              font: { size: 12 }
-            }
+              font: { size: 12 },
+            },
           },
           y: {
             beginAtZero: true,
             title: {
               display: true,
               text: yLabel,
-              font: { size: 12 }
-            }
-          }
+              font: { size: 12 },
+            },
+          },
         },
         plugins: {
           legend: {
-            labels: { font: { size: 13 } }
+            labels: { font: { size: 13 } },
           },
           tooltip: {
             callbacks: {
@@ -227,151 +274,195 @@
                 const value = context.parsed.y;
                 const unit = context.dataset.unit || "";
                 return `${value}${unit}`;
-              }
-            }
-          }
-        }
+              },
+            },
+          },
+        },
       };
     }
 
     function initCharts() {
       // Throughput: rides per minute
-      charts.throughput = new Chart(document.getElementById("chart-throughput"), {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [{
-            label: "Throughput",
-            data: [],
-            borderColor: "#3b82f6",
-            borderWidth: 2,
-            unit: " rides/min"
-          }]
-        },
-        options: makeLineOptions("Throughput (rides/min)", " rides/min")
-      });
+      charts.throughput = new Chart(
+        document.getElementById("chart-throughput"),
+        {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Throughput",
+                data: [],
+                borderColor: "#3b82f6",
+                borderWidth: 2,
+                unit: " rides/min",
+              },
+            ],
+          },
+          options: makeLineOptions("Throughput (rides/min)", " rides/min"),
+        }
+      );
 
       // Latency: matching latency in ms
       charts.latency = new Chart(document.getElementById("chart-latency"), {
         type: "line",
         data: {
           labels: [],
-          datasets: [{
-            label: "Latency",
-            data: [],
-            borderColor: "#8b5cf6",
-            borderWidth: 2,
-            unit: " ms"
-          }]
+          datasets: [
+            {
+              label: "Latency",
+              data: [],
+              borderColor: "#8b5cf6",
+              borderWidth: 2,
+              unit: " ms",
+            },
+          ],
         },
-        options: makeLineOptions("Match Latency (ms)", " ms")
+        options: makeLineOptions("Match Latency (ms)", " ms"),
       });
 
       // Consistency delay: derived from latency
-      charts.consistencyDelay = new Chart(document.getElementById("chart-consistency-delay"), {
-        type: "line",
-        data: {
-          labels: [],
-          datasets: [{
-            label: "Consistency Delay",
-            data: [],
-            borderColor: "#10b981",
-            borderWidth: 2,
-            unit: " ms"
-          }]
-        },
-        options: makeLineOptions("Consistency Delay (ms)", " ms")
-      });
+      charts.consistencyDelay = new Chart(
+        document.getElementById("chart-consistency-delay"),
+        {
+          type: "line",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: "Consistency Delay",
+                data: [],
+                borderColor: "#10b981",
+                borderWidth: 2,
+                unit: " ms",
+              },
+            ],
+          },
+          options: makeLineOptions("Consistency Delay (ms)", " ms"),
+        }
+      );
 
       // Driver status distribution
-      charts.driverStatus = new Chart(document.getElementById("chart-driver-status"), {
-        type: "pie",
-        data: {
-          labels: [],
-          datasets: [{
-            data: [],
-            backgroundColor: ["#2563eb", "#10b981", "#f59e0b"]
-          }]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: "bottom" }
-          }
+      charts.driverStatus = new Chart(
+        document.getElementById("chart-driver-status"),
+        {
+          type: "pie",
+          data: {
+            labels: [],
+            datasets: [
+              {
+                data: [],
+                backgroundColor: ["#2563eb", "#10b981", "#f59e0b"],
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              legend: { position: "bottom" },
+            },
+          },
         }
-      });
+      );
 
       // Ride state counts
-      charts.rideStates = new Chart(document.getElementById("chart-ride-states"), {
-        type: "bar",
-        data: {
-          labels: ["Requested", "En Route", "Completed"],
-          datasets: [{
-            label: "Ride State Count",
-            data: [0, 0, 0],
-            backgroundColor: ["#F29339", "#10b981", "#6b7280"],
-            borderRadius: 6
-          }]
-        },
-        options: {
-          responsive: true,
-          scales: {
-            x: {
-              title: {
-                display: true,
-                text: "Ride State",
-                font: { size: 12 }
-              }
-            },
-            y: {
-              beginAtZero: true,
-              title: {
-                display: true,
-                text: "Number of Rides",
-                font: { size: 12 }
-              }
-            }
+      charts.rideStates = new Chart(
+        document.getElementById("chart-ride-states"),
+        {
+          type: "bar",
+          data: {
+            labels: ["Requested", "En Route", "Completed"],
+            datasets: [
+              {
+                label: "Ride State Count",
+                data: [0, 0, 0],
+                backgroundColor: ["#F29339", "#10b981", "#6b7280"],
+                borderRadius: 6,
+              },
+            ],
           },
-          plugins: {
-            legend: { labels: { font: { size: 13 } } }
-          }
+          options: {
+            responsive: true,
+            scales: {
+              x: {
+                title: {
+                  display: true,
+                  text: "Ride State",
+                  font: { size: 12 },
+                },
+              },
+              y: {
+                beginAtZero: true,
+                title: {
+                  display: true,
+                  text: "Number of Rides",
+                  font: { size: 12 },
+                },
+              },
+            },
+            plugins: {
+              legend: { labels: { font: { size: 13 } } },
+            },
+          },
         }
-      });
+      );
     }
 
     async function loadMetrics() {
       const m = await (await fetch("/api/metrics")).json();
 
-      document.getElementById("m-total-rides").textContent = m.total_rides ?? 0;
-      document.getElementById("m-completed").textContent = m.completed_trips ?? 0;
+      const isIdle =
+        m.total_rides === 0 ||
+        (m.state_requested === 0 &&
+          m.state_enroute === 0 &&
+          m.completed_trips === 0);
+
+      // 📌 Top Metrics
+      document.getElementById("m-total-rides").textContent =
+        m.total_rides ?? 0;
+
+      document.getElementById("m-completed").textContent =
+        m.completed_trips ?? 0;
+
       document.getElementById("m-active").textContent = m.active_matchings ?? 0;
 
-      document.getElementById("m-avg-distance").textContent =
-        (typeof m.avg_distance === "number") ? m.avg_distance.toFixed(2) : "–";
+      document.getElementById("m-avg-distance").textContent = typeof m.avg_distance === "number"
+        ? m.avg_distance.toFixed(2)
+        : "–";
 
-      document.getElementById("m-avg-amount").textContent =
-        (typeof m.avg_amount === "number") ? m.avg_amount.toFixed(2) : "–";
+      document.getElementById("m-avg-amount").textContent = typeof m.avg_amount === "number"
+        ? m.avg_amount.toFixed(2)
+        : "–";
 
-      document.getElementById("m-completion-rate").textContent =
-        m.total_rides ? ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%" : "–";
+      document.getElementById("m-completion-rate").textContent = isIdle
+        ? 0
+        : ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%";
 
-      // Push time-series points
-      appendData(charts.throughput, m.throughput || 0);
-      appendData(charts.latency, m.avg_latency_ms || 0);
-      appendData(charts.consistencyDelay, m.consistency_delay_ms || 0);
+      document.getElementById("m-retries").textContent = m.transaction_retries || 0;
 
-      // Ride state bar
+
+      // 📈 Time-Series Metrics
+      appendData(charts.throughput, isIdle ? "Idle" : m.throughput ?? 0);
+      appendData(charts.latency, isIdle ? "Idle" : m.avg_latency_ms ?? 0);
+      appendData(
+        charts.consistencyDelay,
+        isIdle ? "Idle" : m.consistency_delay_ms ?? 0
+      );
+
+      // 📊 Ride States
       charts.rideStates.data.datasets[0].data = [
         m.state_requested ?? 0,
         m.state_enroute ?? 0,
-        m.completed_trips ?? 0
+        m.completed_trips ?? 0,
       ];
       charts.rideStates.update();
 
-      // Driver status pie
+      // 👥 Driver Status Distribution
       if (m.drivers_by_status) {
         charts.driverStatus.data.labels = Object.keys(m.drivers_by_status);
-        charts.driverStatus.data.datasets[0].data = Object.values(m.drivers_by_status);
+        charts.driverStatus.data.datasets[0].data = Object.values(
+          m.drivers_by_status
+        );
         charts.driverStatus.update();
       }
     }
@@ -380,10 +471,10 @@
       const drivers = await (await fetch("/api/drivers")).json();
       const tbody = document.getElementById("drivers-table-body");
       tbody.innerHTML = "";
-      driverMarkers.forEach(m => map.removeLayer(m));
+      driverMarkers.forEach((m) => map.removeLayer(m));
       driverMarkers = [];
 
-      drivers.forEach(d => {
+      drivers.forEach((d) => {
         tbody.innerHTML += `
           <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
             <td class="px-4 py-2 font-medium">${d.name}</td>
@@ -394,7 +485,10 @@
           </tr>`;
 
         if (d.lat && d.lon) {
-          const marker = L.circleMarker([d.lat, d.lon], { radius: 6, color: "#2563eb" }).addTo(map);
+          const marker = L.circleMarker([d.lat, d.lon], {
+            radius: 6,
+            color: "#2563eb",
+          }).addTo(map);
           marker.bindPopup(`<b>${d.name}</b><br>Status: ${d.status}`);
           driverMarkers.push(marker);
         }
@@ -406,14 +500,16 @@
       const tbody = document.getElementById("rides-table-body");
       tbody.innerHTML = "";
 
-      rides.forEach(r => {
+      rides.forEach((r) => {
         tbody.innerHTML += `
           <tr class="hover:bg-gray-100 dark:hover:bg-gray-800">
             <td class="px-4 py-2">${r.requested_at ?? "-"}</td>
             <td class="px-4 py-2">${r.assigned_driver ?? "-"}</td>
             <td class="px-4 py-2">${r.status ?? "-"}</td>
-            <td class="px-4 py-2 text-center">${r.pickup_lat?.toFixed(4) ?? "-"}, ${r.pickup_lon?.toFixed(4) ?? "-"}</td>
-            <td class="px-4 py-2 text-center">${r.dropoff_lat?.toFixed(4) ?? "-"}, ${r.dropoff_lon?.toFixed(4) ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${r.pickup_lat?.toFixed(4) ?? "-"
+          }, ${r.pickup_lon?.toFixed(4) ?? "-"}</td>
+            <td class="px-4 py-2 text-center">${r.dropoff_lat?.toFixed(4) ?? "-"
+          }, ${r.dropoff_lon?.toFixed(4) ?? "-"}</td>
           </tr>`;
       });
     }
@@ -431,26 +527,37 @@
 
     function initMap() {
       map = L.map("driver-map").setView([40.75, -73.97], 11);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 18,
+      }).addTo(map);
     }
 
     async function loadCrdbOverview() {
-        const c = await (await fetch("/api/crdb/overview")).json();
+      const c = await (await fetch("/api/crdb/overview")).json();
 
-        document.getElementById("n-live").textContent = c.nodes?.live ?? 0;
-        document.getElementById("n-suspect").textContent = c.nodes?.suspect ?? 0;
-        document.getElementById("n-draining").textContent = c.nodes?.draining ?? 0;
-        document.getElementById("n-dead").textContent = c.nodes?.dead ?? 0;
+      document.getElementById("n-live").textContent = c.nodes?.live ?? 0;
+      document.getElementById("n-suspect").textContent =
+        c.nodes?.suspect ?? 0;
+      document.getElementById("n-draining").textContent =
+        c.nodes?.draining ?? 0;
+      document.getElementById("n-dead").textContent = c.nodes?.dead ?? 0;
 
-        document.getElementById("r-total").textContent = c.replication?.total_ranges ?? 0;
-        document.getElementById("r-under").textContent = c.replication?.under_replicated_ranges ?? 0;
-        document.getElementById("r-unavail").textContent = c.replication?.unavailable_ranges ?? 0;
-      }
+      document.getElementById("r-total").textContent =
+        c.replication?.total_ranges ?? 0;
+      document.getElementById("r-under").textContent =
+        c.replication?.under_replicated_ranges ?? 0;
+      document.getElementById("r-unavail").textContent =
+        c.replication?.unavailable_ranges ?? 0;
+    }
 
     async function refreshAll() {
-        await Promise.all([loadMetrics(), loadDrivers(), loadRides(), loadCrdbOverview()]);
-      }
-
+      await Promise.all([
+        loadMetrics(),
+        loadDrivers(),
+        loadRides(),
+        loadCrdbOverview(),
+      ]);
+    }
 
     initCharts();
     initMap();
@@ -458,4 +565,5 @@
     setInterval(refreshAll, 3000);
   </script>
 </body>
+
 </html>
