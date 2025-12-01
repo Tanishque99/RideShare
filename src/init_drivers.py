@@ -1,36 +1,52 @@
 # src/init_drivers.py
 import random
 from db import get_cursor
+import redis
 
-def init_drivers(n=10):
+# Redis setup (only if caching is used)
+r = redis.Redis(host="localhost", port=6379, decode_responses=True)
+BUSY_KEY = "busy_drivers"
+
+
+def init_drivers(n=10, clear_existing=False):
     """
-    Initialize drivers based on random pickup locations from nyc_clean.
+    Initialize n drivers distributed across NYC metro region.
+    Matches loader.py region scale.
+    
+    Parameters:
+        n (int): number of drivers
+        clear_existing (bool): if True → wipe existing drivers
     """
-    print(f"[init_drivers] Initializing {n} drivers...")
+    print(f"[init_drivers] Initializing {n} drivers (wide distribution)...")
 
-    coords = []
-    with get_cursor() as cur:
-        cur.execute("""
-            SELECT pickup_lon, pickup_lat
-            FROM nyc_clean
-            LIMIT %s;
-        """, (n * 5,))
-        coords = cur.fetchall()
-
-    if len(coords) < n:
-        print(f"[init_drivers] Warning: only {len(coords)} coordinates available.")
-
-    sample = random.sample(coords, min(n, len(coords)))
+    NYC_MIN_LON, NYC_MAX_LON = -74.25, -73.75
+    NYC_MIN_LAT, NYC_MAX_LAT = 40.40, 40.80
 
     with get_cursor(commit=True) as cur:
-        for i, (lon, lat) in enumerate(sample):
+        if clear_existing:
+            print("[init_drivers] 🧹 Clearing existing driver records...")
+            cur.execute("DELETE FROM drivers;")
+            # Also clear busy cache
+            r.delete(BUSY_KEY)
+
+        for i in range(n):
+            lon = NYC_MIN_LON + random.random() * (NYC_MAX_LON - NYC_MIN_LON)
+            lat = NYC_MIN_LAT + random.random() * (NYC_MAX_LAT - NYC_MIN_LAT)
+
+            lon += (random.random() - 0.5) * 0.02
+            lat += (random.random() - 0.5) * 0.02
+
             cur.execute("""
-                INSERT INTO drivers (name, current_lon, current_lat, status)
-                VALUES (%s, %s, %s, 'AVAILABLE')
+                INSERT INTO drivers (
+                    name, current_lon, current_lat, status, last_updated
+                )
+                VALUES (%s, %s, %s, 'AVAILABLE', NOW())
+                ON CONFLICT (driver_id) DO NOTHING;
             """, (f"Driver_{i+1}", lon, lat))
 
-    print("[init_drivers] Done.")
+    print(f"[init_drivers] ✔ {n} drivers created. Redis cache cleared = {clear_existing}")
 
 
 if __name__ == "__main__":
-    init_drivers(10)
+    # For repeated test runs: use clear_existing=True
+    init_drivers(10, clear_existing=True)

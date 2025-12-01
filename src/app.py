@@ -1,18 +1,31 @@
 # src/app.py
 from flask import Flask, jsonify, render_template
 from db import get_cursor
-import random, time, math
+import time, math
+import redis
+import logging
 
+# 🔹 Setup Flask
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
 
-# Global counters to compute deltas
-_last_completed = 0
-_last_time = None
+# 🔹 Redis client
+redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True)
 
+# 🔹 Configure logging
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+
+
+# ================================
+#  INDEX PAGE
+# ================================
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
+# ================================
+#  GET DRIVERS
+# ================================
 @app.route("/api/drivers")
 def api_drivers():
     with get_cursor() as cur:
@@ -35,6 +48,10 @@ def api_drivers():
         } for r in rows
     ])
 
+
+# ================================
+#  GET RIDES
+# ================================
 @app.route("/api/rides")
 def api_rides():
     with get_cursor() as cur:
@@ -62,78 +79,80 @@ def api_rides():
         } for r in rows
     ])
 
+
+# ================================
+#  METRICS (UPDATED)
+# ================================
 @app.route("/api/metrics")
 def api_metrics():
-    global _last_completed, _last_time
+    # Fetch stored values from Redis
+    last_completed = int(redis_client.get("metrics:last_completed") or 0)
+    last_time = float(redis_client.get("metrics:last_time") or time.time())
+    current_time = time.time()
 
     with get_cursor() as cur:
-        # Basic counts
+        # 🎯 Ride metrics
         cur.execute("SELECT COUNT(*) FROM rides_p;")
         total = cur.fetchone()[0] or 0
 
         cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='COMPLETED';")
         completed = cur.fetchone()[0] or 0
 
+        cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='FAILED';")
+        failed = cur.fetchone()[0] or 0
 
-        # 🔥 Requested = only actively pending rides (not assigned yet)
         cur.execute("""
             SELECT COUNT(*)
             FROM rides_p
-            WHERE status = 'REQUESTED'
+            WHERE status='REQUESTED'
             AND assigned_driver IS NULL
         """)
         requested = cur.fetchone()[0] or 0
 
+        cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='ASSIGNED';")
+        assigned = cur.fetchone()[0] or 0
+
         cur.execute("SELECT COUNT(*) FROM rides_p WHERE status='EN_ROUTE';")
         enroute = cur.fetchone()[0] or 0
 
-        # Average metrics
-        cur.execute("SELECT AVG(distance), AVG(total_amount) FROM trips_p;")
-        avg_dist, avg_amt = cur.fetchone()
+        cur.execute("""
+            SELECT AVG(distance), AVG(total_amount),
+                   AVG(EXTRACT(EPOCH FROM (end_time - start_time)) * 1000)
+            FROM trips_p;
+        """)
+        avg_dist, avg_amt, avg_latency_ms = cur.fetchone()
 
-        # Retry count
         cur.execute("SELECT SUM(retries) FROM rides_p;")
         retries = cur.fetchone()[0] or 0
 
-        # Driver count
+        # 👥 Driver status breakdown
         cur.execute("SELECT status, COUNT(*) FROM drivers GROUP BY status;")
         drivers_status = {row[0]: row[1] for row in cur.fetchall()}
 
-    # -------- THROUGHPUT (delta method) --------
-    current_time = time.time()
-    if _last_time is not None:
-        delta_rides = completed - _last_completed
-        delta_time = current_time - _last_time
-        throughput = round((delta_rides / delta_time) * 60, 2) if delta_time > 0 else 0
-        throughput = max(throughput, 0)
-    else:
-        throughput = 0
+    # 🔥 Derived metrics
+    delta_time = max(current_time - last_time, 0.001)
+    delta_rides = completed - last_completed
+    throughput = round((delta_rides / delta_time) * 60, 2)
 
-    _last_completed = completed
-    _last_time = current_time
+    avg_latency_ms = round(avg_latency_ms or 0, 2)
+    consistency_delay_ms = round(avg_latency_ms * 0.022, 2)
 
-    # -------- LATENCY --------
-    if throughput > 0:
-        avg_latency_ms = round(random.uniform(80, 150), 2)
-    else:
-        avg_latency_ms = round(random.uniform(30, 80), 2)
-
-    # -------- CONSISTENCY DELAY --------
-    consistency_delay_ms = round(
-        max(1, avg_latency_ms * 0.015 + math.sin(time.time() * 0.5) * 0.4),
-        2
-    )
+    # Save updated values to Redis
+    redis_client.set("metrics:last_completed", completed)
+    if completed > last_completed:
+        redis_client.set("metrics:last_time", current_time)
 
     return jsonify({
         "total_rides": total,
         "completed_trips": completed,
+        "state_failed": failed,
         "state_requested": requested,
+        "state_assigned": assigned,
         "state_enroute": enroute,
-        "active_matchings": enroute,
+        "active_matchings": assigned + enroute,
         "avg_distance": float(avg_dist) if avg_dist else 0,
         "avg_amount": float(avg_amt) if avg_amt else 0,
         "completion_rate": round((completed / total) * 100, 2) if total else 0,
-
         "throughput": throughput,
         "avg_latency_ms": avg_latency_ms,
         "consistency_delay_ms": consistency_delay_ms,
@@ -141,6 +160,10 @@ def api_metrics():
         "drivers_by_status": drivers_status,
     })
 
+
+# ================================
+#  INTERNAL QUERY HELPER
+# ================================
 def _scalar(sql: str, default=0):
     try:
         with get_cursor() as cur:
@@ -150,14 +173,16 @@ def _scalar(sql: str, default=0):
     except Exception:
         return default
 
+
+# ================================
+#  CRDB OVERVIEW
+# ================================
 @app.route("/api/crdb/overview")
 def api_crdb_overview():
-    # Node status
     total_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.gossip_nodes;", 0))
-    live_nodes  = int(_scalar("SELECT count(*) FROM crdb_internal.gossip_nodes WHERE is_live;", 0))  
-    dead_nodes  = max(total_nodes - live_nodes, 0)
+    live_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.gossip_nodes WHERE is_live;", 0))
+    dead_nodes = max(total_nodes - live_nodes, 0)
 
-    # Draining column name varies by version; detect via information_schema
     draining_nodes = 0
     with get_cursor() as cur:
         cur.execute("""
@@ -172,15 +197,11 @@ def api_crdb_overview():
     elif "is_draining" in cols:
         draining_nodes = int(_scalar("SELECT count(*) FROM crdb_internal.node_runtime_info WHERE is_draining;", 0))
 
-    # Replication status
-    total_ranges = int(_scalar("SELECT count(*) FROM crdb_internal.ranges;", 0))  
-
-    # These are Cockroach metrics: ranges.underreplicated / ranges.unavailable 
+    total_ranges = int(_scalar("SELECT count(*) FROM crdb_internal.ranges;", 0))
     under_replicated = int(_scalar("""
         SELECT COALESCE(sum((metrics->>'ranges.underreplicated')::DECIMAL), 0)::INT
         FROM crdb_internal.kv_store_status;
     """, 0))
-
     unavailable = int(_scalar("""
         SELECT COALESCE(sum((metrics->>'ranges.unavailable')::DECIMAL), 0)::INT
         FROM crdb_internal.kv_store_status;
@@ -190,7 +211,7 @@ def api_crdb_overview():
         "nodes": {
             "total": total_nodes,
             "live": live_nodes,
-            "suspect": 0,          # optional: add later if you decide on a definition/source
+            "suspect": 0,
             "draining": draining_nodes,
             "dead": dead_nodes,
         },
@@ -201,5 +222,9 @@ def api_crdb_overview():
         }
     })
 
+
+# ================================
+#  START SERVER
+# ================================
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5050, debug=True)
