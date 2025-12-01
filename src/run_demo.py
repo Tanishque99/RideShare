@@ -7,9 +7,9 @@ import threading
 import time
 
 def main():
-    load_synthetic(1000)
+    load_synthetic(100000)
     clean_data()
-    init_drivers(100)
+    init_drivers(100000)
 
     replay_thread = threading.Thread(target=replayer, args=(None,), daemon=True)
     queue_thread = threading.Thread(target=process_ride, daemon=True)

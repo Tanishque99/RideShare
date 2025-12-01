@@ -1,14 +1,25 @@
 # src/replayer.py
 import time
+import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from matcher import match_ride, complete_ride, busy_drivers  # Redis sync handled in matcher
-from db import get_cursor
+from matcher import (
+    match_ride,
+    complete_ride,
+)  # Redis sync handled in matcher
+from db import get_cursor, get_retry_stats, reset_retry_stats
+
+# Logging for debugging (can be set to WARNING for production)
+logging.basicConfig(
+    level=logging.INFO, format="[%(levelname)s] %(asctime)s - %(message)s"
+)
+replayer_logger = logging.getLogger("replayer")
+replayer_logger.setLevel(logging.WARNING)  # Reduced logging for large-scale test
 
 # Simulation constants
 SIMULATION_SPEEDUP = 30
 MIN_SIM_DURATION_SEC = 2
-MAX_CONCURRENCY = 500  # Sync with Cockroach CPU cores / thread pool
+MAX_CONCURRENCY = 100000  # Sync with Cockroach CPU cores / thread pool
 
 # Retry window = 5 minutes (keep retry active until time expires)
 MAX_WAIT_SECONDS = 5 * 60
@@ -94,7 +105,9 @@ def process_ride(row, idx):
                 )
 
             if elapsed >= MAX_WAIT_SECONDS:
-                print(f"[Thread-{idx}] ❌ EXPIRED → {ride_id} ({elapsed:.1f}s no match)")
+                print(
+                    f"[Thread-{idx}] ❌ EXPIRED → {ride_id} ({elapsed:.1f}s no match)"
+                )
                 with get_cursor(commit=True) as cur:
                     cur.execute(
                         """
@@ -119,7 +132,9 @@ def process_ride(row, idx):
                 )
 
             real_duration = (dropoff_dt - pickup_dt).total_seconds()
-            simulated_duration = max(real_duration / SIMULATION_SPEEDUP, MIN_SIM_DURATION_SEC)
+            simulated_duration = max(
+                real_duration / SIMULATION_SPEEDUP, MIN_SIM_DURATION_SEC
+            )
 
             print(f"[Thread-{idx}] 🚗 EN_ROUTE ({simulated_duration:.2f}s simulated)")
             time.sleep(simulated_duration)
@@ -139,12 +154,18 @@ def process_ride(row, idx):
 def random_backoff():
     """Optional jitter to reduce simultaneous retries."""
     import random
+
     return random.uniform(0.8, 1.3)
 
 
 # ===== Main Replayer =====
 def replayer(limit=50):
     print(f"[replayer] 🎬 Starting simulation of {limit} rides...")
+    replayer_logger.info(f"[DIAG] ========== REPLAYER START: {limit} rides ==========")
+
+    # 🔍 DIAGNOSTIC: Reset retry stats at start
+    reset_retry_stats()
+    simulation_start = time.time()
 
     with get_cursor() as cur:
         cur.execute(
@@ -160,6 +181,12 @@ def replayer(limit=50):
         )
         rides = cur.fetchall()
 
+    replayer_logger.info(f"[DIAG] Loaded {len(rides)} rides from nyc_clean")
+
+    # 🔍 DIAGNOSTIC: Track completion stats
+    completed_count = 0
+    failed_count = 0
+
     with ThreadPoolExecutor(max_workers=MAX_CONCURRENCY) as executor:
         futures = {
             executor.submit(process_ride, ride, i): i
@@ -170,10 +197,31 @@ def replayer(limit=50):
             idx = futures[future]
             try:
                 future.result()
+                completed_count += 1
             except Exception as e:
+                failed_count += 1
                 print(f"[Thread-{idx}] ⚠ Unexpected exception: {e}")
+                replayer_logger.error(f"[DIAG] Thread-{idx} FAILED: {e}")
+
+    simulation_time = time.time() - simulation_start
+    retry_stats = get_retry_stats()
+
+    # 🔍 DIAGNOSTIC: Print summary
+    replayer_logger.info(f"[DIAG] ========== REPLAYER END ==========")
+    replayer_logger.info(f"[DIAG] Total simulation time: {simulation_time:.2f}s")
+    replayer_logger.info(
+        f"[DIAG] Rides completed: {completed_count}, failed: {failed_count}"
+    )
+    replayer_logger.info(f"[DIAG] Transaction retry stats: {retry_stats}")
 
     print("[replayer] 🎉 All rides processed.")
+    print(f"[replayer] 📊 DIAGNOSTIC SUMMARY:")
+    print(f"    - Total time: {simulation_time:.2f}s")
+    print(f"    - Completed: {completed_count}, Failed: {failed_count}")
+    print(f"    - Total retries: {retry_stats['total_retries']}")
+    print(f"    - Successful after retry: {retry_stats['successful_after_retry']}")
+    print(f"    - Failed after max retries: {retry_stats['failed_after_max_retries']}")
+    print(f"    - Conflicts by attempt: {retry_stats['conflicts_by_attempt']}")
 
 
 # ===== Standalone Run =====
