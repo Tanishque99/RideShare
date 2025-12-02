@@ -1,13 +1,19 @@
 # src/replayer.py
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
 from matcher import match_ride, complete_ride
 from db import get_cursor
+from geo import get_region   # NEW
 
-SIMULATION_SPEEDUP = 30
-MIN_SIM_DURATION_SEC = 2
-MAX_CONCURRENCY = 30
-TIMEOUT_SECONDS = 300
+
+# src/replayer.py
+
+SIMULATION_SPEEDUP = 30          # was 30 → trips last longer
+MIN_SIM_DURATION_SEC = 3        # was 2  → drivers stay busy longer
+MAX_CONCURRENCY = 200            # was 10000 → avoid 10k threads on your laptop
+TIMEOUT_SECONDS = 300            # you can keep this or drop if unused
+
 
 def process_ride(row, idx):
     try:
@@ -22,19 +28,29 @@ def process_ride(row, idx):
             "pickup_lat": pla,
             "dropoff_lon": dlo,
             "dropoff_lat": dla,
-            "passenger_count": pax
+            "passenger_count": pax,
         }
 
+        ride_region = get_region(plo, pla)  # NEW
+
+
         # 📌 Insert as REQUESTED ONLY
+        # 📌 Insert ride as REQUESTED
         with get_cursor(commit=True) as cur:
             cur.execute("""
                 INSERT INTO rides_p (
-                    ride_id, requested_at, pickup_lon, pickup_lat,
-                    dropoff_lon, dropoff_lat, passenger_count, status
+                    ride_id, requested_at,
+                    pickup_lon, pickup_lat,
+                    dropoff_lon, dropoff_lat,
+                    passenger_count, region, status, retries
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'REQUESTED')
-                ON CONFLICT (ride_id) DO UPDATE SET status='REQUESTED';
-            """, (ride_id, pickup_dt, plo, pla, dlo, dla, pax))
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'REQUESTED', 0)
+                ON CONFLICT (ride_id) DO UPDATE
+                SET status       = 'REQUESTED',
+                    requested_at = EXCLUDED.requested_at,
+                    region       = EXCLUDED.region;
+            """, (ride_id, pickup_dt, plo, pla, dlo, dla, pax, ride_region))
+
 
         print(f"[Thread-{idx}] 📥 REQUESTED -> {ride_id}")
 

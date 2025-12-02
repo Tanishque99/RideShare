@@ -84,6 +84,8 @@
     <div class="card"><p class="text-gray-500">Avg Dist (km)</p><h2 id="m-avg-distance" class="metric-value">–</h2></div>
     <div class="card"><p class="text-gray-500">Avg Fare ($)</p><h2 id="m-avg-amount" class="metric-value">–</h2></div>
     <div class="card"><p class="text-gray-500">✔ Completion Rate (%)</p><h2 id="m-completion-rate" class="metric-value text-purple-500">0%</h2></div>
+    <div class="card"><p class="text-gray-500">Concurrent Retries</p><h2 id="m-retries" class="metric-value text-pink-500">0</h2></div>
+
   </section>
 
    <!-- Cluster Health Metrics -->
@@ -132,6 +134,7 @@
   <section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
     <div class="card"><canvas id="chart-throughput"></canvas></div>
     <div class="card"><canvas id="chart-latency"></canvas></div>
+    <div class="card"><canvas id="chart-retries-per-sec"></canvas></div>
   </section>
 
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -267,6 +270,21 @@
         options: makeLineOptions("Match Latency (ms)", " ms")
       });
 
+      charts.retriesPerSec = new Chart(document.getElementById("chart-retries-per-sec"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [{
+            label: "Retries/sec",
+            data: [],
+            borderColor: "#f97316",
+            borderWidth: 2,
+            unit: " retries/s"
+          }]
+        },
+        options: makeLineOptions("Retries/sec", " retries/s")
+      });
+
       // Consistency delay: derived from latency
       charts.consistencyDelay = new Chart(document.getElementById("chart-consistency-delay"), {
         type: "line",
@@ -354,11 +372,15 @@
 
       document.getElementById("m-completion-rate").textContent =
         m.total_rides ? ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%" : "–";
+      
+      document.getElementById("m-retries").textContent = m.concurrent_retries ?? 0;
 
       // Push time-series points
       appendData(charts.throughput, m.throughput || 0);
       appendData(charts.latency, m.avg_latency_ms || 0);
+      appendData(charts.retriesPerSec, m.retries_per_sec || 0);   // NEW
       appendData(charts.consistencyDelay, m.consistency_delay_ms || 0);
+
 
       // Ride state bar
       charts.rideStates.data.datasets[0].data = [

@@ -6,8 +6,15 @@ import random, time, math
 app = Flask(__name__, template_folder="../templates", static_folder="../static")
 
 # Global counters to compute deltas
+# Global counters to compute deltas
 _last_completed = 0
 _last_time = None
+
+# For retry rate
+_last_retry_sum = 0
+_last_retry_time = None
+
+
 
 @app.route("/")
 def index():
@@ -64,7 +71,7 @@ def api_rides():
 
 @app.route("/api/metrics")
 def api_metrics():
-    global _last_completed, _last_time
+    global _last_completed, _last_time, _last_retry_sum, _last_retry_time
 
     with get_cursor() as cur:
         # Basic counts
@@ -91,9 +98,19 @@ def api_metrics():
         cur.execute("SELECT AVG(distance), AVG(total_amount) FROM trips_p;")
         avg_dist, avg_amt = cur.fetchone()
 
-        # Retry count
-        cur.execute("SELECT SUM(retries) FROM rides_p;")
-        retries = cur.fetchone()[0] or 0
+        # Total retry count across all rides
+        cur.execute("SELECT COALESCE(SUM(retries), 0) FROM rides_p;")
+        retry_sum = int(cur.fetchone()[0] or 0)
+
+        # Concurrent retries: rides currently in retry state and still REQUESTED
+        cur.execute("""
+            SELECT COUNT(*)
+            FROM rides_p
+            WHERE retries > 0
+              AND status = 'REQUESTED'
+        """)
+        concurrent_retries = int(cur.fetchone()[0] or 0)
+
 
         # Driver count
         cur.execute("SELECT status, COUNT(*) FROM drivers GROUP BY status;")
@@ -111,6 +128,21 @@ def api_metrics():
 
     _last_completed = completed
     _last_time = current_time
+
+        # -------- RETRIES PER SECOND (delta on retry_sum) --------
+    if _last_retry_time is not None:
+        delta_retries = retry_sum - _last_retry_sum
+        delta_retry_time = current_time - _last_retry_time
+        if delta_retry_time > 0:
+            retries_per_sec = round(max(delta_retries, 0) / delta_retry_time, 2)
+        else:
+            retries_per_sec = 0
+    else:
+        retries_per_sec = 0
+
+    _last_retry_sum = retry_sum
+    _last_retry_time = current_time
+
 
     # -------- LATENCY --------
     if throughput > 0:
@@ -137,8 +169,11 @@ def api_metrics():
         "throughput": throughput,
         "avg_latency_ms": avg_latency_ms,
         "consistency_delay_ms": consistency_delay_ms,
-        "transaction_retries": retries,
+        "transaction_retries": retry_sum,      # keep old name for total
+        "concurrent_retries": concurrent_retries,
+        "retries_per_sec": retries_per_sec,
         "drivers_by_status": drivers_status,
+
     })
 
 def _scalar(sql: str, default=0):

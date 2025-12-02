@@ -1,6 +1,7 @@
 # src/init_drivers.py
 import random
 from db import get_cursor
+from geo import get_region   # NEW
 
 def init_drivers(n=10):
     """
@@ -24,12 +25,14 @@ def init_drivers(n=10):
 
     with get_cursor(commit=True) as cur:
         for i, (lon, lat) in enumerate(sample):
+            region = get_region(lon, lat)   # NEW
             cur.execute("""
-                INSERT INTO drivers (name, current_lon, current_lat, status)
-                VALUES (%s, %s, %s, 'AVAILABLE')
-            """, (f"Driver_{i+1}", lon, lat))
+                INSERT INTO drivers (name, current_lon, current_lat, status, region)
+                VALUES (%s, %s, %s, 'AVAILABLE', %s)
+            """, (f"Driver_{i+1}", lon, lat, region))
 
     print("[init_drivers] Done.")
+
 
 
 if __name__ == "__main__":

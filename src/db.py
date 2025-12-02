@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import time
 
 # Connect to your 3-node Cockroach cluster via node 1 (localhost:26257)
-DB_DSN = "postgresql://root@localhost:26257/rideshare?sslmode=disable"
+DB_DSN = "postgresql://tanishque:mU68qegClXd_TarenFLWIQ@mythic-scylla-19024.j77.aws-us-west-2.cockroachlabs.cloud:26257/rideshare?sslmode=verify-full"
 
 
 def get_conn():
@@ -28,7 +28,7 @@ def get_cursor(commit=False):
         conn.close()
 
 
-def run_txn(fn, max_retries=5):
+def run_txn(fn, max_retries=10):
     """
     Run fn(cur) inside a SERIALIZABLE transaction with automatic retries
     on CockroachDB retryable errors (SQLSTATE 40001).
@@ -52,18 +52,31 @@ def run_txn(fn, max_retries=5):
 
             # 40001 = serialization_failure → safe to retry
             if code == "40001" and attempt < max_retries - 1:
+                # NEW: record retry for metrics if ride_id is available
+                try:
+                    # pass ride_id through thread-local for metrics (set in match_ride)
+                    from matcher import current_retry_ride_id  
+                    if current_retry_ride_id is not None:
+                        with get_cursor(commit=True) as mcur:
+                            mcur.execute("""
+                                UPDATE rides_p
+                                SET retries = COALESCE(retries, 0) + 1
+                                WHERE ride_id = %s;
+                            """, (current_retry_ride_id,))
+                except Exception as m_err:
+                    print("retry metric error:", m_err)
+
+                # existing logic
                 try:
                     conn.rollback()
                 except Exception:
                     pass
 
-                sleep = 0.1 * (2 ** attempt)  # exponential backoff
-                print(
-                    f"[run_txn] Retryable Cockroach error (40001) on attempt "
-                    f"{attempt+1}/{max_retries}, sleeping {sleep:.2f}s"
-                )
+                sleep = 0.1 * (2 ** attempt)
+                print(f"[run_txn] Retryable Cockroach error (40001) attempt {attempt+1}/{max_retries}, sleeping {sleep:.2f}s")
                 time.sleep(sleep)
-                continue  # try again
+                continue
+
 
             # Non-retryable or out of retries → re-raise
             try:

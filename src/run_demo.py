@@ -6,10 +6,10 @@ import threading
 import time
 
 def main():
-    load_synthetic(200)
+    load_synthetic(500000)
     clean_data()
-    init_drivers(25)
-    replay_thread = threading.Thread(target=replayer, args=(150,), daemon=True)
+    init_drivers(25000)
+    replay_thread = threading.Thread(target=replayer, args=(5000,), daemon=True)
     replay_thread.start()
     try:
         while True:

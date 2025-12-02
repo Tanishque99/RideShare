@@ -1,6 +1,12 @@
 -- Set active DB
 SET DATABASE = rideshare;
 
+DROP TABLE IF EXISTS trips_p;
+DROP TABLE IF EXISTS rides_p;
+DROP TABLE IF EXISTS drivers;
+DROP TABLE IF EXISTS nyc_clean;
+DROP TABLE IF EXISTS staging_nyc_raw;
+
 -- ===============================
 --  1. RAW STAGING TABLE
 -- ===============================
@@ -46,6 +52,10 @@ CREATE TABLE IF NOT EXISTS drivers (
     last_updated   TIMESTAMP DEFAULT NOW()
 );
 
+ALTER TABLE drivers
+ADD COLUMN IF NOT EXISTS region INT;
+
+
 -- ===============================
 --  4. RIDES TABLE (PARTITIONS READY)
 -- ===============================
@@ -61,6 +71,10 @@ CREATE TABLE IF NOT EXISTS rides_p (
     status         STRING DEFAULT 'REQUESTED',   -- Added safe default
     created_at     TIMESTAMP DEFAULT NOW()
 );
+
+ALTER TABLE rides_p
+ADD COLUMN IF NOT EXISTS region INT;
+
 
 -- ADD PARTITION HELPER COLUMN (NEW)
 ALTER TABLE rides_p 
@@ -115,3 +129,19 @@ ADD CONSTRAINT unique_active_driver_per_ride
 UNIQUE (assigned_driver) 
 WHERE status IN ('ASSIGNED', 'EN_ROUTE');
 
+-- Index to quickly find available drivers in a region
+CREATE INDEX IF NOT EXISTS idx_drivers_status_region
+ON drivers (status, region);
+
+-- Index to quickly scan rides by region + status + requested_at
+CREATE INDEX IF NOT EXISTS idx_rides_region_status_requested_at
+ON rides_p (region, status, requested_at);
+
+CREATE INDEX IF NOT EXISTS idx_rides_region_status_requested_at_part
+ON rides_p (region, status, requested_at)
+PARTITION BY LIST (region) (
+    PARTITION region_nw VALUES IN (0),
+    PARTITION region_ne VALUES IN (1),
+    PARTITION region_sw VALUES IN (2),
+    PARTITION region_se VALUES IN (3)
+);
