@@ -1,6 +1,6 @@
 # src/init_drivers.py
-import random
 from db import get_cursor
+import random
 
 def init_drivers(n=10):
     """
@@ -10,7 +10,8 @@ def init_drivers(n=10):
 
     coords = []
     with get_cursor() as cur:
-        cur.execute("""
+        cur.execute(
+            """
             SELECT pickup_lon, pickup_lat
             FROM nyc_clean
             LIMIT %s;

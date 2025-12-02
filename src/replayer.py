@@ -1,6 +1,9 @@
 # src/replayer.py
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import os
+import json
+from datetime import datetime
 
 from matcher import match_ride, complete_ride
 from db import get_cursor
@@ -39,7 +42,8 @@ def process_ride(row, idx):
 
         # 📌 Insert ride as REQUESTED
         with get_cursor(commit=True) as cur:
-            cur.execute("""
+            cur.execute(
+                """
                 INSERT INTO rides_p (
                     ride_id, requested_at,
                     pickup_lon, pickup_lat,
@@ -91,16 +95,20 @@ def process_ride(row, idx):
             print(f"[Thread-{idx}] 🔁 Retrying ride {ride_id} ...")
             time.sleep(1)
 
-        # 🔄 Transition MATCHING → EN_ROUTE
+        # Transition MATCHING -> EN_ROUTE and update ride status
         if driver_id:
             with get_cursor(commit=True) as cur:
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE drivers
                     SET status='EN_ROUTE'
                     WHERE driver_id=%s AND status='MATCHING';
-                """, (driver_id,))
+                    """,
+                    (driver_id,),
+                )
 
-                cur.execute("""
+                cur.execute(
+                    """
                     UPDATE rides_p
                     SET status='EN_ROUTE', retries = 0
                     WHERE ride_id=%s;
@@ -118,9 +126,63 @@ def process_ride(row, idx):
         print(f"[Thread-{idx}] ❌ ERROR in process_ride: {e}")
 
 
-def replayer(limit=50):
-    print(f"[replayer] Starting for {limit} rides...")
+# New helper: collect replica distribution and query performance metrics from Postgres
+def collect_db_metrics():
+    """
+    Collect:
+      - replica_distribution: connection counts per replication client (pg_stat_replication)
+      - top_queries: top statements from pg_stat_statements (if available)
+    Returns a dict suitable for JSON output.
+    """
+    metrics = {
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "replica_distribution": {},
+        "top_queries": [],
+    }
 
+    try:
+        with get_cursor() as cur:
+            # Replica distribution (may be empty/unavailable)
+            try:
+                cur.execute("""
+                    SELECT COALESCE(client_addr::text, 'local') AS node, count(*) AS connections
+                    FROM pg_stat_replication
+                    GROUP BY client_addr;
+                """)
+                rows = cur.fetchall()
+                for node, cnt in rows:
+                    metrics["replica_distribution"][str(node)] = int(cnt)
+            except Exception:
+                metrics["replica_distribution_error"] = "pg_stat_replication unavailable"
+
+            # Top queries (requires pg_stat_statements extension)
+            try:
+                cur.execute("""
+                    SELECT query, calls, total_time, mean_time
+                    FROM pg_stat_statements
+                    ORDER BY total_time DESC
+                    LIMIT 10;
+                """)
+                qrows = cur.fetchall()
+                for q, calls, total_time, mean_time in qrows:
+                    metrics["top_queries"].append({
+                        "query_snippet": (q or "")[:300],
+                        "calls": int(calls or 0),
+                        "total_time_ms": float(total_time or 0.0),
+                        "mean_time_ms": float(mean_time or 0.0),
+                    })
+            except Exception:
+                metrics["top_queries_error"] = "pg_stat_statements unavailable"
+    except Exception as e:
+        metrics["error"] = str(e)
+
+    return metrics
+
+
+def replayer(limit=50):
+    print(f"[replayer] Starting for {limit or 'ALL'} rides...")
+
+    # build query without LIMIT when limit is None/Falsey
     with get_cursor() as cur:
         cur.execute("""
             SELECT ride_id, pickup_datetime, dropoff_datetime, passenger_count,

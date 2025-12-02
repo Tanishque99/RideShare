@@ -2,7 +2,7 @@
 import math
 import time
 import random
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from db import run_txn, get_cursor
 
@@ -133,9 +133,6 @@ def match_ride(ride: dict):
 
 
 def complete_ride(ride, driver_id, simulated_duration_seconds):
-    """
-    Mark the ride as COMPLETED and make the driver AVAILABLE again.
-    """
     def txn(cur):
         distance_km = _haversine(
             ride["pickup_lon"],

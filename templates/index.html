@@ -176,9 +176,15 @@
     </div>
   </section>
 
-<section class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+  <!-- Replica & Query Performance -->
+
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
   <div class="card"><canvas id="chart-throughput"></canvas></div>
   <div class="card"><canvas id="chart-latency"></canvas></div>
+  <div class="card">
+    <h2 class="font-semibold mb-2">Retries / sec</h2>
+    <canvas id="chart-retries"></canvas>
+  </div>
 </section>
 
   <section class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -241,6 +247,8 @@
     let charts = {},
       map,
       driverMarkers = [];
+   const REFRESH_INTERVAL_MS = 3000;
+   let previousRetries = null;
 
     // Helper to build line-chart options with axis labels + units in tooltip
     function makeLineOptions(yLabel, unitLabel) {
@@ -342,6 +350,25 @@
         }
       );
 
+      // Retries/sec time-series
+      charts.retries = new Chart(document.getElementById("chart-retries"), {
+        type: "line",
+        data: {
+          labels: [],
+          datasets: [
+            {
+              label: "Retries / sec",
+              data: [],
+              borderColor: "#ef4444",
+              backgroundColor: "rgba(239,68,68,0.08)",
+              borderWidth: 2,
+              unit: " /s",
+            },
+          ],
+        },
+        options: makeLineOptions("Retries per second", " /s"),
+      });
+
       // Driver status distribution
       charts.driverStatus = new Chart(
         document.getElementById("chart-driver-status"),
@@ -406,6 +433,13 @@
           },
         }
       );
+
+      // Replica & Top-queries UI removed
+    }
+
+    async function loadReplicaMetrics() {
+      // replica/query UI removed — keep as no-op to avoid runtime errors
+      return;
     }
 
     async function loadMetrics() {
@@ -439,6 +473,21 @@
         : ((m.completed_trips / m.total_rides) * 100).toFixed(1) + "%";
 
       document.getElementById("m-retries").textContent = m.transaction_retries || 0;
+
+
+      // Retries/sec: compute delta from cumulative transaction_retries
+      const currentRetries = Number(m.transaction_retries || 0);
+      let retriesPerSec = 0;
+      if (previousRetries === null) {
+        // first sample — avoid spike, show 0
+        retriesPerSec = 0;
+      } else {
+        const delta = currentRetries - previousRetries;
+        const secs = REFRESH_INTERVAL_MS / 1000;
+        retriesPerSec = delta > 0 ? delta / secs : 0;
+      }
+      previousRetries = currentRetries;
+      appendData(charts.retries, Number(retriesPerSec.toFixed(3)));
 
 
       // 📈 Time-Series Metrics
@@ -562,7 +611,7 @@
     initCharts();
     initMap();
     refreshAll();
-    setInterval(refreshAll, 3000);
+    setInterval(refreshAll, REFRESH_INTERVAL_MS);
   </script>
 </body>
 

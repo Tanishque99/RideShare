@@ -68,6 +68,7 @@ def api_metrics():
 
     # STEP 1: Fetch all necessary metrics from DB
     with get_cursor() as cur:
+        # totals
         cur.execute("SELECT COUNT(*) FROM rides_p;")
         total = cur.fetchone()[0] or 0
 
@@ -174,6 +175,7 @@ def _scalar(sql: str, default=0):
             return default if v is None else v
     except Exception:
         return default
+
 
 @app.route("/api/crdb/overview")
 def api_crdb_overview():
