@@ -2,6 +2,7 @@
 
 Ride-sharing platforms need to handle a constant stream of location updates, ride requests, and state changes (requested, assigned, en route, completed). Many users interact with the system at the same time, and they expect fast responses and no double-booking of drivers. This makes the database a critical part of the system.
 Traditional single-node databases or simple master–replica setups can become a bottleneck in this setting. They often struggle with heavy writes on popular areas, higher latency for users in other regions, and limited fault tolerance if the primary node fails. Some systems move to NoSQL or manual sharding to scale, but then they may lose strong consistency or become harder to manage.
+
 Recent work on “distributed SQL” databases, such as CockroachDB, aims to combine the familiarity of SQL with automatic sharding, replication, and strong consistency across nodes. RideShareDB, uses CockroachDB to explore how a distributed database can support a realistic ride-allocation workload. The gap we address is that many examples of distributed databases are very simple; they do not show how to handle geo-based matching, high write concurrency, and changing ride states together in one end-to-end system
 
 - **3-node CockroachDB cluster** (local)
